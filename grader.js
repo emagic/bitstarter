@@ -24,6 +24,8 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var restler = require('restler');
+
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -54,6 +56,26 @@ var checkHtmlFile = function(htmlfile, checksfile) {
     }
     return out;
 };
+var checkURLFile = function(urlfile, checksfile) {
+    var checks = loadChecks(checksfile).sort();
+   
+ restler.get(urlfile)
+	.on('complete',function(downloadFile){
+	    $=cheerio.load(downloadFile.toString());
+	    var out = {};
+	    for(var ii in checks) {
+		var present = $(checks[ii]).length > 0;
+		out[checks[ii]] = present;
+	    }
+	    var outJson = JSON.stringify(out, null, 4);
+	    console.log(outJson);	
+	})
+	.on('error',function(){
+	    console.log('download file fail');
+	})
+
+   
+};
 
 var clone = function(fn) {
     // Workaround for commander.js issue.
@@ -63,12 +85,21 @@ var clone = function(fn) {
 
 if(require.main == module) {
     program
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-        .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+        .option('-c, --checks <check_file>', 'Path to checks.json')
+        .option('-u, --url <url_file>', 'Path to url')
+        .option('-f, --file <html_file>', 'Path to index.html')
+	.parse(process.argv);
+
+    var checkJson = "";
+    if(program.url){
+	checkJson =checkURLFile(program.url,program.checks);
+    }
+    else if(program.file){
+        checkJson = checkHtmlFile(program.file, program.checks);
+	var outJson = JSON.stringify(checkJson, null, 4);
+	console.log(outJson);
+    }
+    
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
